@@ -3,6 +3,8 @@ package test;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.io.*;
+import java.util.Random;
+import java.util.random.*;
 
 
 
@@ -13,36 +15,48 @@ public class Connector
 	{
 		String hostname = "localhost";
 		int port = 12300;
-		try (Socket socket = new Socket(hostname, port)) {
+		try (Socket socket = new Socket(hostname, port))
+		{
 
-		OutputStream raus = socket.getOutputStream();
+			OutputStream raus = socket.getOutputStream();
 
-        InputStream input = socket.getInputStream();
-        InputStreamReader reader = new InputStreamReader(input);
+			InputStream input = socket.getInputStream();
+			InputStreamReader reader = new InputStreamReader(input);
 
-        String jsonAuthData = "{'type': 'auth-request','content': {'user': 'agentA1','pw': '1'}}0";	// added one 0 at the end that gets converted later
+			String agent = "agentA1";
+			String password = "1";
 
-        byte[] byteData = jsonAuthData.getBytes(StandardCharsets.UTF_8);
-        byteData[byteData.length-1] = (byte)0;		// add a 0 in byte form as an "end" bit
+			raus.write(createAuthMessage(agent,password));	//Authentification Message
+
+			int character;
+			StringBuilder data = new StringBuilder();
+			Random randomDirection = new Random();
+			while(true)
+			{
+
+				data = new StringBuilder();
+				// receive data
+				while ((character = reader.read()) != 0)
+				{            //Input reader
+					data.append((char) character);
+					//System.out.println(data);
+				}
 
 
-        raus.write(byteData);	//output message
+				String moveDirection = "n";
+
+				switch (randomDirection.nextInt(4))//random Direction generation
+				{
+					case 0: moveDirection = "n"; break;
+					case 1: moveDirection = "e"; break;
+					case 2: moveDirection = "s"; break;
+					case 3: moveDirection = "w"; break;
+				}
 
 
-        int character;
-        StringBuilder data = new StringBuilder();
 
 
-
-		while(true) {
-
-
-			while ((character = reader.read()) != 0) {            //Input reader
-				data.append((char) character);
-				//System.out.println(data);
-			}
-
-			System.out.println(data);                    //Input print to Console
+				System.out.println(data);                    //Input print to Console
 
 
 				// get id for Action out of the request string
@@ -52,26 +66,21 @@ public class Connector
 				int idEnd = data.indexOf(",", idStart);
 
 				String action_id = "";
-				if (idStart != -1) {
+				if (idStart != -1)
+				{
 					action_id = data.substring(idStart, idEnd);
 					//System.out.println(action_id);
 				}
 
-			data = new StringBuilder();
+				//If message contains type "Request-action" send out an action
+				if(data.indexOf("request-action")!= -1)
+				{
+					raus.write(createMoveMessage(action_id,moveDirection));	//output message
+				}
 
-			//If message contains type "Request-action" send out an action
-			// example move action
-			String JsonMoveString = "{'type': 'action','content': {'id': " + action_id +",'type': 'move','p': ['n']}}0";
 
-			//String JsonMoveString = "{'type': 'auth-request','content': {}}0";
-			System.out.println(JsonMoveString);
-			byteData = JsonMoveString.getBytes(StandardCharsets.UTF_8);
-			byteData[byteData.length-1] = (byte)0;		// add a 0 in byte form as an "end" bit
 
-			raus.write(byteData);	//output message
-
-		}
-
+			}
 		}
 
 		catch (UnknownHostException ex)
@@ -84,5 +93,31 @@ public class Connector
 			System.out.println("I/O error: " + ex.getMessage());
 		}
 	}
+
+
+
+
+	public static byte[] createMoveMessage(String id,String direction)	//creates Move Message from id and direction given
+	{
+		String JsonMoveString = "{'type': 'action','content': {'id': " + id +",'type': 'move','p': ['"+ direction +"']}}0";
+
+		return convertMessage(JsonMoveString);
+	}
+
+	public static byte[] createAuthMessage(String agent,String password) // creates Authentification Message from agent-number and password given
+	{
+		String jsonAuthData = "{'type': 'auth-request','content': {'user': '" + agent + "','pw': '"+ password +  "'}}0";
+
+		return	convertMessage(jsonAuthData);
+	}
+
+	public static byte[] convertMessage(String message) // converts message from a String into a sendable Json-Byte-String
+	{
+		byte[] convertedString = message.getBytes(StandardCharsets.UTF_8);
+		convertedString[convertedString.length-1] = (byte)0;		// add a 0 in byte form as an "end" bit
+
+		return convertedString;
+	}
+
 
 }
